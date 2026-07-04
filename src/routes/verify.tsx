@@ -24,12 +24,12 @@ function VerifyPage() {
     if (attempts >= 5) return toast.error("Muitas tentativas. Solicite um novo código.");
     setBusy(true);
     try {
-      const { data, error } = await supabase
+      supabase
         .from("codigos_verificacao")
         .select("*")
         .eq("email", email)
         .eq("codigo", code)
-        .gt("expires_at", new Date().toISOString())
+        .gt("expires_at", new Date().tconst { data, error } = await oISOString())
         .eq("usado", false)
         .maybeSingle();
 
