@@ -33,70 +33,45 @@ function AuthPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+
     try {
       if (tab === "login") {
-        // Cadastro
-const { data, error } = await supabase.auth.signUp({
-  email,
-  password,
-});
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
 
-if (error) throw error;
+        toast.success("Login realizado");
+        navigate({ to: "/dashboard", replace: true });
+      } else {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
 
-const user = data.user;
+        const user = data.user;
+        if (!user) throw new Error("Não foi possível criar o usuário.");
 
-if (!user) {
-  throw new Error("Não foi possível criar o usuário.");
-}
+        const { error: usuarioError } = await supabase.from("usuarios").insert({
+          auth_uid: user.id,
+          email: user.email!,
+          empresa: null,
+        });
+        if (usuarioError) throw usuarioError;
 
-// Salva na tabela usuarios
-const { error: usuarioError } = await supabase
-  .from("usuarios")
-  .insert({
-    auth_uid: user.id,
-    email: user.email!,
-    empresa: null,
-  });
+        const code = generateCode();
+        const expiracao = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-if (usuarioError) {
-  throw usuarioError;
-}
+        const { error: codigoError } = await supabase.from("codigos_verificacao").insert({
+          email: user.email!,
+          codigo: code,
+          expiracao,
+        });
+        if (codigoError) throw codigoError;
 
-// Gera código de verificação
-const code = generateCode();
+        await sendVerificationEmail(user.email!, code);
 
-const expiracao = new Date(
-  Date.now() + 10 * 60 * 1000
-).toISOString();
-
-// Salva código
-const { error: codigoError } = await supabase
-  .from("codigos_verificacao")
-  .insert({
-    email: user.email!,
-    codigo: code,
-    expiracao,
-  });
-
-if (codigoError) {
-  throw codigoError;
-}
-
-// Envia email
-await sendVerificationEmail(user.email!, code);
-
-toast.success(
-  "Conta criada com sucesso! Verifique seu e-mail."
-);
-
-navigate({
-  to: "/verify",
-  search: {
-    email: user.email!,
-  },
-});
+        toast.success("Conta criada com sucesso! Verifique seu e-mail.");
+        navigate({ to: "/verify", search: { email: user.email! } });
+      }
     } catch (err: any) {
-      toast.error(err.message ?? "Erro na autenticação");
+      toast.error(err?.message ?? "Erro na autenticação");
     } finally {
       setBusy(false);
     }
